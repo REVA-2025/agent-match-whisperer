@@ -1,12 +1,13 @@
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search } from "lucide-react";
+import { Search, FileAudio, Loader2 } from "lucide-react";
 import { mockAnalyzeConversation } from "@/lib/mockApi";
 import { toast } from "sonner";
+import { pipeline } from "@huggingface/transformers";
 
 interface ConversationResult {
   needs: {
@@ -21,7 +22,9 @@ interface ConversationResult {
 export const ConversationAnalyzer = () => {
   const [conversation, setConversation] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [result, setResult] = useState<ConversationResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleAnalyze = async () => {
     if (conversation.trim().length < 20) {
@@ -42,6 +45,40 @@ export const ConversationAnalyzer = () => {
     }
   };
 
+  const handleAudioUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsTranscribing(true);
+    try {
+      // Initialize the whisper pipeline
+      const transcriber = await pipeline(
+        "automatic-speech-recognition",
+        "onnx-community/whisper-tiny.en",
+        { device: "webgpu" }
+      );
+
+      // Transcribe the audio file
+      const result = await transcriber(file);
+      
+      // Append the transcription to the existing conversation
+      setConversation(prev => {
+        const prefix = prev ? prev + "\n\n" : "";
+        return prefix + `[Audio Transcription]:\n${result.text}`;
+      });
+      
+      toast.success("Audio transcribed successfully");
+    } catch (error) {
+      console.error("Transcription error:", error);
+      toast.error("Failed to transcribe audio");
+    } finally {
+      setIsTranscribing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return "text-green-700 bg-green-100";
     if (confidence >= 60) return "text-amber-700 bg-amber-100";
@@ -53,13 +90,36 @@ export const ConversationAnalyzer = () => {
       <CardHeader>
         <CardTitle className="text-xl font-semibold">Conversation Analyzer</CardTitle>
         <CardDescription>
-          Paste email or text conversations to extract client needs and preferences
+          Paste email or text conversations, or upload audio files to extract client needs and preferences
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isTranscribing}
+              className="gap-2"
+            >
+              {isTranscribing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileAudio className="h-4 w-4" />
+              )}
+              {isTranscribing ? "Transcribing..." : "Upload Audio"}
+            </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="audio/*"
+              onChange={handleAudioUpload}
+            />
+          </div>
+
           <Textarea
-            placeholder="Paste conversation content here..."
+            placeholder="Paste conversation content here or upload an audio file..."
             className="min-h-[150px] font-mono text-sm"
             value={conversation}
             onChange={(e) => setConversation(e.target.value)}
