@@ -2,7 +2,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Calendar, User, MessageSquare, Home, Settings } from "lucide-react";
+import { User, MessageSquare, Home, Settings } from "lucide-react";
 
 const navigationItems = [
   {
@@ -19,11 +19,6 @@ const navigationItems = [
     name: "Conversations",
     icon: MessageSquare,
     href: "/conversations",
-  },
-  {
-    name: "Calendar",
-    icon: Calendar,
-    href: "/calendar",
   },
   {
     name: "Settings",
